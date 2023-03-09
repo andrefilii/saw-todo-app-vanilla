@@ -1,4 +1,5 @@
 import './style.css'
+import { v4 as uuid } from 'uuid';
 
 export interface Todo {
     state: 'done' | 'ongoing';
@@ -6,27 +7,60 @@ export interface Todo {
     id: string;
 }
 
-let todos: Todo[] = [
+const debugText = document.createElement('p');
+// renderDebugText();
+
+// updateCounter();
+
+function updateCounter() {
+    const counterText = `${appState.todos.filter(({ state }) => state === 'done').length}/${appState.todos.length}`;
+    const counterSpan: HTMLSpanElement = document.querySelector('.counter')!;
+    counterSpan.innerText = counterText;
+}
+
+class AppState {
+    private _todos: Todo[] = [];
+    get todos() { return this._todos; }
+    set todos(v: Todo[]) {
+        this._todos = v;
+        this.renderDebugText();
+        this.updateCounter();
+    }
+
+    constructor(todos: Todo[]) {
+        this.todos = todos;
+    }
+
+    renderDebugText() {
+        debugText.innerHTML = JSON.stringify(this.todos);
+        document.body.appendChild(debugText);
+    }
+
+    updateCounter() {
+        const counterText = `${this.todos.filter(({ state }) => state === 'done').length}/${this.todos.length}`;
+        const counterSpan: HTMLSpanElement = document.querySelector('.counter')!;
+        counterSpan.innerText = counterText;
+    }
+    
+}
+
+let appState = new AppState([
     { id: '1', text: 'git add .', state: 'done' },
     { id: '2', text: 'git commit', state: 'ongoing' },
     { id: '3', text: 'git push', state: 'ongoing' },
     { id: '4', text: 'escape building', state: 'ongoing' },
-]
-const debugText = document.createElement('p');
-renderDebugText();
+]);
 
-todos.forEach(todo => {
+appState.todos.forEach(todo => {
     const li = createTodoElement(todo);
     document.querySelector('ul')?.appendChild(li);
 })
 
-const completed = (tds: Todo[]) => {
-    return tds.filter(({ state }) => state === 'done').length
-}
 
 function renderDebugText() {
-    debugText.innerHTML = JSON.stringify(todos);
+    debugText.innerHTML = JSON.stringify(appState.todos);
     document.body.appendChild(debugText);
+    updateCounter();
 }
 
 const addTextbox = document.querySelector('input');
@@ -38,18 +72,16 @@ addTextbox?.addEventListener(
             const todo: Todo = {
                 state: 'ongoing',
                 text,
-                id: '1',
+                id: uuid(),
             }
             const li = createTodoElement(todo);
             document.querySelector('ul')?.appendChild(li);
             addTextbox.value = '';
-            todos = [...todos, todo];
+            appState.todos = [...appState.todos, todo];
             renderDebugText();
         }
     }
 );
-
-
 
 function createTodoElement({ id, text, state }: Todo) {
     const li = document.createElement('li');
@@ -67,21 +99,44 @@ function createTodoElement({ id, text, state }: Todo) {
 
     li.querySelector('button')?.addEventListener('click', () => {
         li.parentElement?.removeChild(li);
-        // TODO: remove todo from todos
+        appState.todos = appState.todos.filter((t) => t.id !== id);
+        renderDebugText();
     })
 
     const checkbox = li.querySelector('input[type="checkbox"]');
-    checkbox?.addEventListener(
-        'change',
-        () => {
-            li.querySelector('span')?.classList.toggle('done');
-            const t = todos.find((t) => t.id === id);
-            if (!!t) {
-                t.state = t.state === 'done' ? 'ongoing' : 'done';
-                renderDebugText();
-            }
+    checkbox?.addEventListener('change', () => {
+        li.querySelector('span')?.classList.toggle('done');
+        const t = appState.todos.find((t) => t.id === id);
+        if (!!t) {
+            t.state = t.state === 'done' ? 'ongoing' : 'done';
+            renderDebugText();
         }
+    }
     )
+
+    const input: HTMLInputElement = li.querySelector('input[type="text"]')!
+    const span = li.querySelector('span')!;
+    const div = li.querySelector('.todo-item>div')!;
+
+    span.addEventListener('dblclick', () => {
+        input.classList.remove('hidden');
+        div.classList.add('hidden');
+        input.value = span.innerText;
+    })
+
+    input.addEventListener('keyup', (e: KeyboardEvent) => {
+        if (e.key === 'Enter' && input.value !== '') {
+            div.classList.toggle('hidden');
+            input.classList.toggle('hidden');
+            span.innerText = input.value;
+            appState.todos = appState.todos.map((t) => t.id === id
+                ? { ...t, text: input.value }
+                : t);
+            renderDebugText();
+        }
+    })
+
+
 
     return li;
 }
